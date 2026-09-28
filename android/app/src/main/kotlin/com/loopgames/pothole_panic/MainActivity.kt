@@ -1,0 +1,5 @@
+package com.loopgames.pothole_panic
+
+import io.flutter.embedding.android.FlutterActivity
+
+class MainActivity : FlutterActivity()
