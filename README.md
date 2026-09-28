@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # Pothole Panic
 
 Little auto. Big city. Bad roads. A complete three-lane arcade game built with
@@ -126,3 +127,6 @@ Useful official references:
 - https://developers.google.com/admob/flutter/quick-start
 - https://developers.google.com/admob/flutter/rewarded
 - https://developers.google.com/admob/flutter/privacy
+=======
+# Pothole-Panic
+>>>>>>> 0fa271a31fe67e22dd3dc148d10a16e8e5450bc3
