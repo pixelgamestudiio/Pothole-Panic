@@ -5,22 +5,28 @@ import 'package:flutter/foundation.dart';
 import 'components/auto_rickshaw.dart';
 import 'components/hud.dart';
 import 'components/road.dart';
+import 'components/weather.dart';
 import 'game_config.dart';
 import 'game_state.dart';
 import 'managers/audio_manager.dart';
 import 'run_model.dart';
+import 'friend_challenge.dart';
 
 class PotholeGame extends FlameGame {
-  PotholeGame({required this.audio, required this.onRunEnded})
-    : super(
-        camera: CameraComponent.withFixedResolution(
-          width: GameConfig.width,
-          height: GameConfig.height,
-        ),
-      );
+  PotholeGame({
+    required this.audio,
+    required this.onRunEnded,
+    this.onCoinsEarned,
+  }) : super(
+         camera: CameraComponent.withFixedResolution(
+           width: GameConfig.width,
+           height: GameConfig.height,
+         ),
+       );
   final RunModel model = RunModel();
   final AudioManager audio;
   final VoidCallback onRunEnded;
+  final ValueChanged<int>? onCoinsEarned;
   final ValueNotifier<int> revision = ValueNotifier(0);
   double _accumulator = 0, _uiClock = 0;
   @override
@@ -28,8 +34,10 @@ class PotholeGame extends FlameGame {
     camera.viewfinder.anchor = Anchor.topLeft;
     await world.addAll([
       Road(model),
+      RoadLighting(model),
       RoadObjects(model),
       AutoRickshaw(model),
+      Weather(model),
       FloatingHud(model),
     ]);
   }
@@ -38,8 +46,12 @@ class PotholeGame extends FlameGame {
     revision.value++;
   }
 
-  void startRun() {
-    model.start();
+  void startRun({FriendChallenge? challenge}) {
+    model.start(
+      seed: challenge?.seed,
+      challenge: challenge != null,
+      targetScore: challenge?.targetScore ?? 0,
+    );
     _accumulator = 0;
     refresh();
   }
@@ -74,6 +86,7 @@ class PotholeGame extends FlameGame {
   @override
   void update(double dt) {
     final before = model.phase;
+    final coinsBefore = model.coins;
     _accumulator += dt.clamp(0.0, 0.25);
     while (_accumulator >= GameConfig.fixedStep) {
       model.step(GameConfig.fixedStep);
@@ -83,7 +96,11 @@ class PotholeGame extends FlameGame {
       audio.play(event);
     }
     model.events.clear();
+    if (model.coins > coinsBefore) {
+      onCoinsEarned?.call(model.coins - coinsBefore);
+    }
     audio.setRunning(model.phase == GamePhase.playing);
+    audio.setWeather(model.rain);
     if (before != GamePhase.gameOver && model.phase == GamePhase.gameOver) {
       onRunEnded();
     }

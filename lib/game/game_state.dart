@@ -1,8 +1,13 @@
 enum GamePhase { menu, playing, paused, dying, gameOver }
 
-enum GameEvent { pickup, horn, crash, nearMiss, revive }
+enum GameEvent { pickup, horn, crash, nearMiss, revive, damage, skid, coin }
 
-enum ItemKind { pothole, passenger }
+enum ItemKind { pothole, passenger, oil, barricade, coin }
+
+extension ItemKindRules on ItemKind {
+  bool get isHazard => this != ItemKind.passenger && this != ItemKind.coin;
+  bool get damages => this == ItemKind.pothole || this == ItemKind.barricade;
+}
 
 class RoadItem {
   RoadItem({

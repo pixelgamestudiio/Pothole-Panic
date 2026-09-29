@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
-import '../game/components/auto_rickshaw.dart';
+import '../game/components/vehicle_art.dart';
+import '../game/vehicle.dart';
 import '../game/components/palette.dart';
 
 TextStyle arcade(double size, {Color color = Palette.cream}) =>
@@ -91,43 +92,53 @@ class RoundControl extends StatelessWidget {
 }
 
 class RickshawIllustration extends StatelessWidget {
-  const RickshawIllustration({super.key, this.size = 130});
+  const RickshawIllustration({
+    super.key,
+    this.size = 130,
+    this.vehicle = Vehicle.auto,
+  });
   final double size;
+  final Vehicle vehicle;
   @override
   Widget build(BuildContext context) =>
-      CustomPaint(size: Size(size, size), painter: _RickshawPainter());
+      CustomPaint(size: Size(size, size), painter: _RickshawPainter(vehicle));
 }
 
 class _RickshawPainter extends CustomPainter {
+  _RickshawPainter(this.vehicle);
+  final Vehicle vehicle;
   @override
   void paint(Canvas canvas, Size size) {
     canvas.translate(size.width / 2, size.height / 2);
     canvas.rotate(-0.16);
-    paintRickshaw(canvas, scale: size.height / 108);
+    paintVehicle(canvas, vehicle, scale: size.height / 125);
   }
 
   @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+  bool shouldRepaint(covariant _RickshawPainter oldDelegate) =>
+      oldDelegate.vehicle != vehicle;
 }
 
 class ModalSurface extends StatelessWidget {
   const ModalSurface({super.key, required this.child});
   final Widget child;
   @override
-  Widget build(BuildContext context) => ColoredBox(
-    color: Palette.ink.withValues(alpha: 0.82),
-    child: Center(
-      child: SingleChildScrollView(
-        padding: const EdgeInsets.all(26),
-        child: Container(
-          width: 360,
+  Widget build(BuildContext context) => BlockSemantics(
+    child: ColoredBox(
+      color: Palette.ink.withValues(alpha: 0.82),
+      child: Center(
+        child: SingleChildScrollView(
           padding: const EdgeInsets.all(26),
-          decoration: BoxDecoration(
-            color: Palette.ink,
-            borderRadius: BorderRadius.circular(26),
-            border: Border.all(color: const Color(0xFF53634B)),
+          child: Container(
+            width: 360,
+            padding: const EdgeInsets.all(26),
+            decoration: BoxDecoration(
+              color: Palette.ink,
+              borderRadius: BorderRadius.circular(26),
+              border: Border.all(color: const Color(0xFF53634B)),
+            ),
+            child: child,
           ),
-          child: child,
         ),
       ),
     ),

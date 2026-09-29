@@ -7,11 +7,15 @@ class AudioManager {
   bool enabled;
   final _effects = List.generate(4, (_) => AudioPlayer());
   final _ambience = AudioPlayer();
+  final _rain = AudioPlayer();
+  bool _rainStarted = false, _weatherBusy = false, _disposed = false;
+  double _rainVolume = 0, _rainTarget = 0;
   int _next = 0;
   bool _running = false;
   Future<void> setRunning(bool running) async {
     if (_running == running) return;
     _running = running;
+    if (!running) await setWeather(0);
     try {
       if (running && enabled) {
         await _ambience.setReleaseMode(ReleaseMode.loop);
@@ -29,12 +33,38 @@ class AudioManager {
     final running = _running;
     _running = false;
     if (!value) {
+      await setWeather(0);
       await _ambience.stop();
       for (final player in _effects) {
         await player.stop();
       }
     } else if (running) {
       await setRunning(true);
+    }
+  }
+
+  Future<void> setWeather(double intensity) async {
+    _rainTarget = enabled && _running && !_disposed
+        ? intensity.clamp(0, 1) * .55
+        : 0;
+    if (_weatherBusy || _disposed) return;
+    _weatherBusy = true;
+    try {
+      while (!_disposed && (_rainTarget - _rainVolume).abs() > .02) {
+        final target = _rainTarget;
+        if (!_rainStarted && target > 0) {
+          await _rain.setReleaseMode(ReleaseMode.loop);
+          await _rain.play(AssetSource('audio/rain.wav'), volume: target);
+          _rainStarted = true;
+        } else if (_rainStarted) {
+          await _rain.setVolume(target);
+        }
+        _rainVolume = target;
+      }
+    } catch (_) {
+      // Audio failures must never interrupt the road simulation.
+    } finally {
+      _weatherBusy = false;
     }
   }
 
@@ -46,6 +76,9 @@ class AudioManager {
       GameEvent.crash => 'hit_pothole',
       GameEvent.nearMiss => 'near_miss',
       GameEvent.revive => 'pickup',
+      GameEvent.coin => 'pickup',
+      GameEvent.damage => 'hit_pothole',
+      GameEvent.skid => 'near_miss',
     };
     final player = _effects[_next++ % _effects.length];
     unawaited(_play(player, name));
@@ -61,6 +94,8 @@ class AudioManager {
   }
 
   Future<void> dispose() async {
+    _disposed = true;
+    await _rain.dispose();
     await _ambience.dispose();
     for (final player in _effects) {
       await player.dispose();

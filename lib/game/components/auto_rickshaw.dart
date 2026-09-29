@@ -5,6 +5,7 @@ import '../game_config.dart';
 import '../game_state.dart';
 import '../run_model.dart';
 import 'palette.dart';
+import 'vehicle_art.dart';
 
 /// Original vector artwork: sharp at every device density, no missing sprites.
 void paintRickshaw(
@@ -129,6 +130,21 @@ class AutoRickshaw extends Component {
   @override
   void render(Canvas canvas) {
     canvas.save();
+    if (model.skidLeft > 0) {
+      final tire = Paint()
+        ..color = const Color(0xAA172525)
+        ..strokeWidth = 3;
+      for (final x in [-13.0, 13.0]) {
+        canvas.drawLine(
+          Offset(model.playerX + x, GameConfig.playerY + 30),
+          Offset(
+            model.playerX + x - model.skidOffset * 2,
+            GameConfig.playerY + 90,
+          ),
+          tire,
+        );
+      }
+    }
     canvas.translate(
       model.playerX,
       GameConfig.playerY + sin(model.scroll * 0.06) * 1.2,
@@ -141,9 +157,10 @@ class AutoRickshaw extends Component {
       canvas.scale(1 - t * 0.8);
     }
     final lean = (GameConfig.laneX(model.lane) - model.playerX) / 650;
-    paintRickshaw(
+    paintVehicle(
       canvas,
-      lean: lean,
+      model.vehicle,
+      lean: lean + model.skidOffset / 80,
       shield: model.shielded,
       time: model.elapsed,
     );

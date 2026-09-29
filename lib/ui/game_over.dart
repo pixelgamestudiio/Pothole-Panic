@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import '../game/components/palette.dart';
 import '../game/run_model.dart';
+import '../game/game_state.dart';
+import '../game/friend_challenge.dart';
+import 'friend_challenge_panel.dart';
 import 'widgets.dart';
 
 class GameOver extends StatelessWidget {
@@ -38,11 +41,13 @@ class GameOver extends StatelessWidget {
           child: Text('ARRE YAAR!', style: arcade(12, color: Palette.ink)),
         ),
         const SizedBox(height: 17),
-        Text('ROAD 1. AUTO 0.', style: arcade(23)),
+        Text('END OF THE ROAD', style: arcade(22)),
         const SizedBox(height: 6),
-        const Text(
-          'That pothole had other plans.',
-          style: TextStyle(color: Color(0xFFB8C6AF), fontSize: 13),
+        Text(
+          model.lastCrash == ItemKind.barricade
+              ? 'Roadworks won this round.'
+              : 'That pothole had other plans.',
+          style: const TextStyle(color: Color(0xFFB8C6AF), fontSize: 13),
         ),
         const SizedBox(height: 24),
         Text('${model.score}', style: arcade(57, color: Palette.yellow)),
@@ -70,11 +75,38 @@ class GameOver extends StatelessWidget {
             children: [
               _stat('DISTANCE', '${(model.distance / 10).floor()} m'),
               _stat('FARE', '₹${model.fare}'),
-              _stat('PICKUPS', '${model.passengers}'),
+              _stat('COINS', '+${model.coins}'),
             ],
           ),
         ),
         const SizedBox(height: 23),
+        if (model.competitive) ...[
+          Text(
+            model.challengeTarget == 0
+                ? 'YOUR CHALLENGE IS READY'
+                : model.score > model.challengeTarget
+                ? 'YOU BEAT YOUR FRIEND!'
+                : model.score == model.challengeTarget
+                ? 'IT’S A TIE!'
+                : '${model.challengeTarget - model.score} POINTS TO CATCH YOUR FRIEND',
+            style: arcade(13, color: Palette.yellow),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 8),
+          if (model.challengeTarget > 0)
+            Text(
+              'Friend: ${model.challengeTarget}  ·  You: ${model.score}',
+              style: const TextStyle(color: Palette.mint, fontSize: 12),
+            ),
+          const SizedBox(height: 12),
+          ChallengeShare(
+            challenge: FriendChallenge(
+              seed: model.courseSeed,
+              targetScore: model.score,
+            ),
+          ),
+          const SizedBox(height: 18),
+        ],
         if (canContinue) ...[
           GameButton(
             browser
@@ -97,7 +129,7 @@ class GameOver extends StatelessWidget {
           Text(
             browser
                 ? 'One free rescue per run in the browser edition.'
-                : 'One rescue per run · 2.5 seconds of protection',
+                : 'Full repair · one rescue per run · 2.5s protection',
             textAlign: TextAlign.center,
             style: const TextStyle(color: Color(0xFF96AE9D), fontSize: 10),
           ),
@@ -112,7 +144,11 @@ class GameOver extends StatelessWidget {
           const SizedBox(height: 12),
         ],
         GameButton(
-          busy ? 'PLEASE WAIT…' : 'ANOTHER ROUND',
+          busy
+              ? 'PLEASE WAIT…'
+              : model.competitive
+              ? 'RETRY THIS ROAD'
+              : 'ANOTHER ROUND',
           onPressed: busy ? null : onRetry,
           icon: Icons.replay_rounded,
         ),

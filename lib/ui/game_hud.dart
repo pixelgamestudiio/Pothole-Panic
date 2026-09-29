@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../game/components/palette.dart';
 import '../game/run_model.dart';
+import '../game/road_environment.dart';
 import 'widgets.dart';
 
 class GameHud extends StatelessWidget {
@@ -89,13 +90,107 @@ class GameHud extends StatelessWidget {
         const SizedBox(height: 12),
         IgnorePointer(
           child: Container(
+            margin: const EdgeInsets.symmetric(horizontal: 18),
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+            decoration: BoxDecoration(
+              color: Palette.ink.withValues(alpha: 0.9),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Semantics(
+                  label: '${model.health} of 3 health',
+                  child: Row(
+                    children: [
+                      for (var i = 0; i < 3; i++)
+                        Icon(
+                          i < model.health
+                              ? Icons.favorite
+                              : Icons.favorite_border,
+                          color: i < model.health
+                              ? Palette.orange
+                              : const Color(0xFF687A6E),
+                          size: 18,
+                        ),
+                    ],
+                  ),
+                ),
+                Text(
+                  '${model.coins} COINS',
+                  style: arcade(11, color: Palette.yellow),
+                ),
+                Text(
+                  model.rain > 0.15 ? 'RAIN' : model.daylight.label,
+                  style: const TextStyle(
+                    color: Palette.mint,
+                    fontSize: 10,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+        const SizedBox(height: 8),
+        IgnorePointer(
+          child: Container(
+            margin: const EdgeInsets.symmetric(horizontal: 18),
+            padding: const EdgeInsets.fromLTRB(12, 7, 12, 7),
+            decoration: BoxDecoration(
+              color: Palette.ink.withValues(alpha: .92),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Column(
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      '${model.difficulty.label} · ${model.meters.floor()} m',
+                      style: arcade(10, color: Palette.yellow),
+                    ),
+                    Text(
+                      model.difficulty == Difficulty.hard
+                          ? 'ENDLESS'
+                          : model.difficulty == Difficulty.easy
+                          ? 'MEDIUM AT 500 m'
+                          : 'HARD AT 1,000 m',
+                      style: const TextStyle(color: Palette.mint, fontSize: 8),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 5),
+                LinearProgressIndicator(
+                  value: model.stageProgress.clamp(0, 1),
+                  minHeight: 3,
+                  color: Palette.yellow,
+                  backgroundColor: const Color(0xFF35544A),
+                ),
+              ],
+            ),
+          ),
+        ),
+        const SizedBox(height: 6),
+        IgnorePointer(
+          child: Container(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
             decoration: BoxDecoration(
               color: Palette.ink.withValues(alpha: 0.8),
               borderRadius: BorderRadius.circular(15),
             ),
             child: Text(
-              model.shielded ? 'SHIELD ON  ·  KEEP GOING!' : model.district,
+              model.shielded
+                  ? 'SHIELD ON  ·  KEEP GOING!'
+                  : model.skidLeft > 0
+                  ? 'OIL SKID · KEEP STEERING'
+                  : model.competitive
+                  ? model.challengeTarget == 0
+                        ? 'FRIEND CHALLENGE · SET YOUR SCORE'
+                        : model.score > model.challengeTarget
+                        ? 'TARGET BEATEN · KEEP GOING!'
+                        : 'FRIEND’S SCORE: ${model.challengeTarget} · KEEP GOING!'
+                  : '${model.district} · ${model.conditions}',
               style: const TextStyle(
                 color: Palette.cream,
                 fontSize: 9,
@@ -106,6 +201,22 @@ class GameHud extends StatelessWidget {
           ),
         ),
         const Spacer(),
+        if (model.stageBannerLeft > 0)
+          IgnorePointer(
+            child: Container(
+              margin: const EdgeInsets.only(bottom: 15),
+              padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
+              decoration: BoxDecoration(
+                color: Palette.ink.withValues(alpha: .94),
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(color: Palette.yellow),
+              ),
+              child: Text(
+                '${model.difficulty.label} · KEEP ROLLING!',
+                style: arcade(15, color: Palette.yellow),
+              ),
+            ),
+          ),
         if (model.elapsed < 6)
           IgnorePointer(
             child: Container(

@@ -6,6 +6,7 @@ import '../run_model.dart';
 import 'palette.dart';
 import 'passenger.dart';
 import 'pothole.dart';
+import 'road_pickups.dart';
 
 class RoadObjects extends Component {
   RoadObjects(this.model) : super(priority: 2);
@@ -16,15 +17,17 @@ class RoadObjects extends Component {
       final x = GameConfig.laneX(item.lane);
       if (item.kind == ItemKind.pothole) {
         paintPothole(canvas, x, item.y, item.radius, item.variant);
-      } else {
+      } else if (item.kind == ItemKind.passenger) {
         paintPassenger(canvas, x, item.y, model.elapsed);
+      } else {
+        paintRoadPickup(canvas, item, x, model.elapsed);
       }
     }
   }
 }
 
 class FloatingHud extends Component {
-  FloatingHud(this.model) : super(priority: 5);
+  FloatingHud(this.model) : super(priority: 7);
   final RunModel model;
   @override
   void render(Canvas canvas) {

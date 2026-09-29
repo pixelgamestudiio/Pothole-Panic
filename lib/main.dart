@@ -7,11 +7,14 @@ import 'ads/ad_manager.dart';
 import 'ads/banner_slot.dart';
 import 'game/components/palette.dart';
 import 'game/game_state.dart';
+import 'game/friend_challenge.dart';
 import 'game/managers/audio_manager.dart';
 import 'game/pothole_game.dart';
 import 'services/save_service.dart';
 import 'ui/game_hud.dart';
 import 'ui/game_over.dart';
+import 'ui/friend_challenge_panel.dart';
+import 'ui/garage.dart';
 import 'ui/main_menu.dart';
 import 'ui/pause_menu.dart';
 import 'ui/widgets.dart';
@@ -40,14 +43,24 @@ class PotholePanicApp extends StatelessWidget {
       ),
       scaffoldBackgroundColor: const Color(0xFF091D1B),
     ),
-    home: GameScreen(save: save),
+    initialRoute: '/',
+    home: GameScreen(
+      save: save,
+      initialInvite: Uri.base.queryParameters['challenge'],
+    ),
   );
 }
 
 class GameScreen extends StatefulWidget {
-  const GameScreen({super.key, required this.save, this.audioOverride});
+  const GameScreen({
+    super.key,
+    required this.save,
+    this.audioOverride,
+    this.initialInvite,
+  });
   final SaveService save;
   final AudioManager? audioOverride;
+  final String? initialInvite;
   @override
   State<GameScreen> createState() => _GameScreenState();
 }
@@ -59,19 +72,44 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
   final focus = FocusNode(debugLabel: 'game controls');
   Offset? _gestureStart;
   bool _swiped = false, _busy = false, _banked = false, _help = false;
+  bool _garage = false;
+  bool _friends = false;
+  FriendChallenge? _activeChallenge;
   String? _message;
   int _previousBest = 0;
   bool get sound => audio.enabled;
   @override
   void initState() {
     super.initState();
+    _friends = widget.initialInvite != null;
     WidgetsBinding.instance.addObserver(this);
     audio = widget.audioOverride ?? AudioManager(enabled: widget.save.sound);
     game = PotholeGame(
       audio: audio,
+      onCoinsEarned: (amount) {
+        unawaited(
+          widget.save.creditCoins(amount).then((saved) {
+            if (!mounted) return;
+            if (!saved) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text(
+                    'Coins could not be saved. Check device storage.',
+                  ),
+                ),
+              );
+            }
+            setState(() {});
+          }),
+        );
+      },
       onRunEnded: () {
         unawaited(widget.save.saveBest(game.model.score));
-        if (AdManager.supported) ads.loadRewarded();
+        if (game.model.competitive) {
+          unawaited(_rememberChallenge());
+        } else if (AdManager.supported) {
+          ads.loadRewarded();
+        }
       },
     );
     ads.addListener(_adsChanged);
@@ -89,7 +127,13 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
-      ads.foreground(atMenu: game.model.phase == GamePhase.menu && !_help);
+      ads.foreground(
+        atMenu:
+            game.model.phase == GamePhase.menu &&
+            !_help &&
+            !_garage &&
+            !_friends,
+      );
     } else {
       game.pauseRun();
       if (state == AppLifecycleState.paused ||
@@ -108,11 +152,34 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
     super.dispose();
   }
 
-  void _start() {
+  Future<void> _rememberChallenge() async {
+    try {
+      final saved = await widget.save.saveChallenge(
+        FriendChallenge(
+          seed: game.model.courseSeed,
+          targetScore: game.model.score,
+        ),
+      );
+      if (!saved) throw StateError('Storage unavailable');
+      if (mounted) setState(() {});
+    } catch (_) {
+      if (mounted) {
+        setState(
+          () => _message =
+              'Could not save the invite. Copy it below before leaving.',
+        );
+      }
+    }
+  }
+
+  void _start({FriendChallenge? challenge}) {
+    _activeChallenge = challenge;
+    _friends = false;
+    game.model.vehicle = widget.save.selectedVehicle;
     _previousBest = widget.save.best;
     _banked = false;
     _message = null;
-    game.startRun();
+    game.startRun(challenge: challenge);
     focus.requestFocus();
   }
 
@@ -136,9 +203,10 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
       }
       if (!mounted) return;
       if (restart) {
-        _start();
+        _start(challenge: _activeChallenge);
       } else {
         game.menu();
+        _activeChallenge = null;
       }
     } finally {
       if (mounted) setState(() => _busy = false);
@@ -146,7 +214,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
   }
 
   Future<void> _continue() async {
-    if (_busy || game.model.continued) return;
+    if (_busy || game.model.continued || game.model.competitive) return;
     setState(() {
       _busy = true;
       _message = null;
@@ -164,8 +232,27 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
   }
 
   KeyEventResult _key(FocusNode node, KeyEvent event) {
-    if (event is! KeyDownEvent || _busy || _help) return KeyEventResult.ignored;
+    if (event is! KeyDownEvent || _busy) {
+      return KeyEventResult.ignored;
+    }
     final key = event.logicalKey;
+    if (_help || _garage || _friends) {
+      if (key == LogicalKeyboardKey.escape) {
+        setState(() {
+          _help = false;
+          _garage = false;
+          _friends = false;
+        });
+        return KeyEventResult.handled;
+      }
+      return KeyEventResult.ignored;
+    }
+    // Menu buttons own their keyboard activation. A global Enter shortcut
+    // steals activation from Garage/Help in web accessibility mode.
+    if (game.model.phase == GamePhase.menu ||
+        game.model.phase == GamePhase.gameOver) {
+      return KeyEventResult.ignored;
+    }
     if (key == LogicalKeyboardKey.arrowLeft || key == LogicalKeyboardKey.keyA) {
       game.steer(-1);
     } else if (key == LogicalKeyboardKey.arrowRight ||
@@ -181,9 +268,6 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
       } else if (game.model.phase == GamePhase.paused) {
         game.resumeRun();
       }
-    } else if (key == LogicalKeyboardKey.enter &&
-        game.model.phase == GamePhase.menu) {
-      _start();
     } else {
       return KeyEventResult.ignored;
     }
@@ -191,7 +275,9 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
   }
 
   void _swipe(PointerMoveEvent event) {
-    if (_gestureStart == null || _swiped || _help) return;
+    if (_gestureStart == null || _swiped || _help || _garage || _friends) {
+      return;
+    }
     final delta = event.localPosition - _gestureStart!;
     if (delta.distance < 24) return;
     if (delta.dx.abs() > delta.dy.abs()) {
@@ -249,9 +335,21 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
                             builder: (context, revision, child) {
                               final phase = game.model.phase;
                               return PopScope(
-                                canPop: phase == GamePhase.menu,
+                                canPop:
+                                    phase == GamePhase.menu &&
+                                    !_help &&
+                                    !_garage &&
+                                    !_friends,
                                 onPopInvokedWithResult: (didPop, result) {
-                                  if (!didPop && phase == GamePhase.playing) {
+                                  if (!didPop &&
+                                      (_help || _garage || _friends)) {
+                                    setState(() {
+                                      _help = false;
+                                      _garage = false;
+                                      _friends = false;
+                                    });
+                                  } else if (!didPop &&
+                                      phase == GamePhase.playing) {
                                     game.pauseRun();
                                   }
                                 },
@@ -283,7 +381,15 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
                                     if (phase == GamePhase.menu)
                                       MainMenu(
                                         best: widget.save.best,
+                                        coins: widget.save.coins,
+                                        vehicle: widget.save.selectedVehicle,
+                                        onGarage: () {
+                                          setState(() => _garage = true);
+                                          focus.requestFocus();
+                                        },
                                         onStart: _start,
+                                        onFriends: () =>
+                                            setState(() => _friends = true),
                                         onHelp: () =>
                                             setState(() => _help = true),
                                         onSound: _sound,
@@ -312,7 +418,9 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
                                         onRetry: () => _finish(restart: true),
                                         onHome: () => _finish(restart: false),
                                         onContinue: _continue,
-                                        canContinue: !game.model.continued,
+                                        canContinue:
+                                            !game.model.continued &&
+                                            !game.model.competitive,
                                         busy: _busy,
                                         browser: !AdManager.supported,
                                         rewardLoading: ads.rewardLoading,
@@ -321,6 +429,22 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
                                         message: _message,
                                       ),
                                     if (_help) _helpPanel(),
+                                    if (_friends)
+                                      FriendChallengePanel(
+                                        initialInvite:
+                                            widget.initialInvite ?? '',
+                                        lastResult: widget.save.lastChallenge,
+                                        onStart: (challenge) =>
+                                            _start(challenge: challenge),
+                                        onClose: () =>
+                                            setState(() => _friends = false),
+                                      ),
+                                    if (_garage)
+                                      Garage(
+                                        save: widget.save,
+                                        onClose: () =>
+                                            setState(() => _garage = false),
+                                      ),
                                   ],
                                 ),
                               );
@@ -355,17 +479,32 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
         _tip(
           Icons.person_pin_circle_outlined,
           'PICK UP',
-          'Green passengers earn ₹10. Every fare adds to your score.',
+          'Passengers earn ₹10. Gold coins are worth 5 and save immediately. Spend coins in the garage.',
         ),
         _tip(
           Icons.campaign_rounded,
           'HONK',
-          'Swipe up or press Space: 1 second of speed, a shield, and double fare. Recharges in 5 seconds.',
+          'Swipe up or press Space: 1 second of extra speed, a shield, and double fare. Recharges in 16 seconds. Save it for a tight escape.',
         ),
         _tip(
           Icons.favorite_outline,
           'KEEP GOING',
-          'One rescue per run. Near misses earn 5 bonus points.',
+          'Three health points. Potholes and barricades cost one. A rescue repairs your ride. Near misses earn 5 points.',
+        ),
+        _tip(
+          Icons.water_drop_outlined,
+          'READ THE ROAD',
+          'Oil throws your balance off for 1 second. Counter-steer to recover. Rain reduces grip. A ready horn clears the skid.',
+        ),
+        _tip(
+          Icons.speed,
+          'GO THE DISTANCE',
+          'Easy to 500 m. Medium to 1,000 m. Then varied bursts, staggered hazards and lane holds. Wider crossings arrive at 3,000 m, longer combinations at 6,000 m.',
+        ),
+        _tip(
+          Icons.wb_twilight,
+          'CHASE THE DAYLIGHT',
+          'Day turns to afternoon at 500 m, then night at 1,000 m. Dawn returns at 2,000 m and the cycle repeats. Rain changes gradually.',
         ),
         const SizedBox(height: 8),
         GameButton('GOT IT!', onPressed: () => setState(() => _help = false)),
@@ -378,8 +517,8 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
               content: SingleChildScrollView(
                 child: Text(
                   AdManager.supported
-                      ? 'Scores and sound preferences are saved on this device. This build uses Google test ads. The Google Mobile Ads SDK may process device and advertising data. Consent controls are shown where required. No game account or location permission is requested.\n\nOriginal vector art and synthesized sound effects. Bungee typeface by David Jonathan Ross, SIL Open Font License. Built with Flutter and Flame.'
-                      : 'Scores and sound preferences are saved in this browser. This edition has no ads or analytics. No game account or location permission is requested.\n\nOriginal vector art and synthesized sound effects. Bungee typeface by David Jonathan Ross, SIL Open Font License. Built with Flutter and Flame.',
+                      ? 'Scores, sound preferences, coins and garage unlocks are saved on this device. This build uses Google test ads. The Google Mobile Ads SDK may process device and advertising data. Consent controls are shown where required. No game account or location permission is requested.\n\nOriginal vector art and synthesized sound effects. Bungee typeface by David Jonathan Ross, SIL Open Font License. Built with Flutter and Flame.'
+                      : 'Scores, sound preferences, coins and garage unlocks are saved in this browser. This edition has no ads or analytics. No game account or location permission is requested.\n\nOriginal vector art and synthesized sound effects. Bungee typeface by David Jonathan Ross, SIL Open Font License. Built with Flutter and Flame.',
                 ),
               ),
               actions: [

@@ -8,7 +8,8 @@ abstract final class GameConfig {
   static const playerHalfHeight = 29.0;
   static const laneChangeSeconds = 0.2;
   static const boostSeconds = 1.0;
-  static const boostCooldown = 5.0;
+  static const boostCooldown = 16.0;
+  static const boostMultiplier = 1.35;
   static const fixedStep = 1 / 120;
   static double laneX(int lane) => roadLeft + laneWidth * (lane + 0.5);
 }

@@ -9,17 +9,18 @@ abstract final class CollisionManager {
     RoadItem item,
     double oldY,
     double oldPlayerX,
-    double newPlayerX,
-  ) {
-    final halfY = item.kind == ItemKind.pothole ? item.radius * 0.55 : 16.0;
-    final halfX = item.kind == ItemKind.pothole ? item.radius * 0.8 : 15.0;
+    double newPlayerX, {
+    double playerHalfWidth = GameConfig.playerHalfWidth,
+  }) {
+    final halfY = item.kind.isHazard ? item.radius * 0.55 : 16.0;
+    final halfX = item.kind.isHazard ? item.radius * 0.8 : 15.0;
     final x = GameConfig.laneX(item.lane) - oldPlayerX;
     final y = oldY - GameConfig.playerY;
     final dx = oldPlayerX - newPlayerX;
     final dy = item.y - oldY;
     double enter = 0, leave = 1;
     final axes = [
-      (x, dx, halfX + GameConfig.playerHalfWidth),
+      (x, dx, halfX + playerHalfWidth),
       (y, dy, halfY + GameConfig.playerHalfHeight),
     ];
     for (final (p, d, extent) in axes) {

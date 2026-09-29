@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../game/components/palette.dart';
+import '../game/vehicle.dart';
 import 'widgets.dart';
 
 class MainMenu extends StatelessWidget {
@@ -10,8 +11,16 @@ class MainMenu extends StatelessWidget {
     required this.onHelp,
     required this.onSound,
     required this.sound,
+    this.coins = 0,
+    this.vehicle = Vehicle.auto,
+    this.onGarage,
+    this.onFriends,
   });
   final int best;
+  final int coins;
+  final Vehicle vehicle;
+  final VoidCallback? onGarage;
+  final VoidCallback? onFriends;
   final VoidCallback onStart, onHelp, onSound;
   final bool sound;
   @override
@@ -105,7 +114,7 @@ class MainMenu extends StatelessWidget {
                       ),
                       const SizedBox(height: 12),
                       const Text(
-                        'Little auto. Big city. Bad roads.',
+                        'Your ride. Big city. Bad roads.',
                         style: TextStyle(
                           color: Color(0xFFB8C6AF),
                           fontSize: 15,
@@ -133,7 +142,7 @@ class MainMenu extends StatelessWidget {
                                 ),
                               ),
                             ),
-                            const RickshawIllustration(size: 130),
+                            RickshawIllustration(size: 130, vehicle: vehicle),
                             Positioned(
                               right: 12,
                               top: 30,
@@ -193,6 +202,34 @@ class MainMenu extends StatelessWidget {
                         icon: Icons.arrow_forward_rounded,
                       ),
                       const SizedBox(height: 10),
+                      if (onFriends != null) ...[
+                        GameButton(
+                          'FRIEND CHALLENGE',
+                          onPressed: onFriends,
+                          secondary: true,
+                          compact: true,
+                          icon: Icons.people_outline,
+                        ),
+                        const SizedBox(height: 8),
+                      ],
+                      if (onGarage != null) ...[
+                        GameButton(
+                          'GARAGE · $coins COINS',
+                          onPressed: onGarage,
+                          secondary: true,
+                          compact: true,
+                          icon: Icons.garage_rounded,
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          '${vehicle.label} SELECTED',
+                          style: const TextStyle(
+                            color: Palette.mint,
+                            fontSize: 10,
+                            letterSpacing: 1.2,
+                          ),
+                        ),
+                      ],
                       TextButton(
                         onPressed: onHelp,
                         child: const Text(

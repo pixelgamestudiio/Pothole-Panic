@@ -1,5 +1,5 @@
 param(
-    [ValidateSet('web', 'android', 'test', 'check', 'build-web', 'apk')]
+    [ValidateSet('web', 'android', 'test', 'dry-run', 'check', 'build-web', 'apk')]
     [string]$Target = 'web'
 )
 $ErrorActionPreference = 'Stop'
@@ -26,8 +26,14 @@ switch ($Target) {
     'web' { & $flutterCommand run -d chrome }
     'android' { & $flutterCommand run }
     'test' { & $flutterCommand test }
+    'dry-run' { & $flutterCommand test --dart-define=CAPTURE_DRY_RUN=true }
     'check' { & $flutterCommand analyze }
-    'build-web' { & $flutterCommand build web --release --no-web-resources-cdn }
+    'build-web' {
+        & $flutterCommand build web --release --no-web-resources-cdn
+        $webBuildExit = $LASTEXITCODE
+        if ($webBuildExit -eq 0) { & (Join-Path $PSScriptRoot 'stamp_web.ps1') }
+        exit $webBuildExit
+    }
     'apk' { & $flutterCommand build apk --release }
 }
 exit $LASTEXITCODE
