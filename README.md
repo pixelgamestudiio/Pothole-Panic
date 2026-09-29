@@ -138,9 +138,13 @@ spawn interval: that interval is not fair at boosted top speed.
 
 Developed using Flutter 3.47.5 / Dart 3.13.4, Flame 1.38.2, and Mobile Ads 9.1.0.
 Commit `pubspec.lock` with the game to reproduce the resolved dependency versions.
-An earlier Android APK build passed and its signature was verified; it supports
-Android API 24+ and targets API 36. That APK predates the latest environment and
-progression changes. Rebuilding the APK is pending user retest and approval.
+Android supports API 24+ (Android 7.0+) and targets API 36. Version 1.2.1 fixes
+an Android release startup crash in WorkManager's Room database: R8 full mode
+removed a constructor instantiated through reflection. The app's ProGuard rules
+now explicitly preserve Room database constructors while keeping optimization.
+The fix was verified on an Android 16 emulator with three cold launches and
+visible gameplay. This does not certify every Android version or phone model.
+Versions 1.0.0 and 1.2.0 both reproduced the startup crash; use the 1.2.1 APK.
 Native ads and device performance still need physical-device testing.
 Run the commands below to validate changes without rebuilding Android.
 
@@ -166,7 +170,18 @@ Play past 25 seconds for rain in normal runs, and pause/resume to check audio.
 Watch daylight return at 2,000 m. Create a friend challenge, finish, copy its
 invite, and paste it into Friend Challenge on another browser/device running
 this version. Confirm the target score, same course, retry and saved last invite.
-APK packaging follows approval of this browser retest.
+After every Android release build, run the emulator startup check before sharing:
+
+```powershell
+.\tool\smoke-apk.ps1 -ApkPath build\app\outputs\flutter-apk\app-release.apk -AdbPath <path-to-adb.exe>
+```
+
+The check installs onto `emulator-5554` (override with `-Serial`), tests three cold
+launches and checks for crashes and a foreground game activity. It intentionally
+refuses physical-device serials. Verify gameplay, audio, sharing and lifecycle
+behavior separately on real devices. APK signature and build checks alone cannot
+detect native runtime startup failures. Keep versioned APK filenames to avoid
+confusing old downloads with the current build.
 
 ## Mobile ads and release configuration
 
